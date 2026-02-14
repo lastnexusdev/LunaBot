@@ -175,11 +175,14 @@ async function transcribeBuffer(float32Samples, sampleRate = 48000) {
       '--no-timestamps',
     ];
 
-    // Set LD_LIBRARY_PATH (Linux) / DYLD_LIBRARY_PATH (macOS) so the
-    // dynamically linked libwhisper.so and libggml*.so are found next to
-    // the binary.
+    // Ensure native libs are resolvable next to the binary:
+    //   Windows: PATH
+    //   Linux:   LD_LIBRARY_PATH
+    //   macOS:   DYLD_LIBRARY_PATH
     const env = { ...process.env };
-    if (process.platform === 'linux') {
+    if (process.platform === 'win32') {
+      env.PATH = WHISPER_DIR + (env.PATH ? ';' + env.PATH : '');
+    } else if (process.platform === 'linux') {
       env.LD_LIBRARY_PATH = WHISPER_DIR + (env.LD_LIBRARY_PATH ? ':' + env.LD_LIBRARY_PATH : '');
     } else if (process.platform === 'darwin') {
       env.DYLD_LIBRARY_PATH = WHISPER_DIR + (env.DYLD_LIBRARY_PATH ? ':' + env.DYLD_LIBRARY_PATH : '');

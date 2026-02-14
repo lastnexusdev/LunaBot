@@ -17,30 +17,22 @@ Offline desktop call transcription and summarization application built with **El
 - Node.js 18+
 - npm 9+
 
-### Optional: Local Whisper (for real transcription)
+### Local Whisper setup (automated)
 
-1. Build [whisper.cpp](https://github.com/ggerganov/whisper.cpp):
-   ```bash
-   git clone https://github.com/ggerganov/whisper.cpp
-   cd whisper.cpp && cmake -B build && cmake --build build --config Release
-   ```
-2. Download a model:
-   ```bash
-   bash models/download-ggml-model.sh base.en
-   ```
-3. Place files in the project:
-   ```
-   whisper/
-     whisper-cli          # (or whisper-cli.exe on Windows)
-     libwhisper.so        # shared libraries (Linux)
-     libggml.so
-     libggml-base.so
-     libggml-cpu.so
-     models/
-       ggml-base.en.bin
-   ```
+Whisper is now provisioned automatically during install/build:
 
-Without Whisper installed, the app runs with placeholder transcription text.
+```bash
+npm install      # runs postinstall -> setup-whisper
+npm run build    # also runs setup-whisper before packaging
+```
+
+The setup script (`scripts/setup-whisper.js`) does this cross-platform:
+
+- **Windows**: downloads a prebuilt `whisper-cli.exe` release bundle + DLLs
+- **Linux/macOS**: clones `whisper.cpp` and builds it locally with CMake
+- **All platforms**: downloads `whisper/models/ggml-base.en.bin` if missing
+
+If setup fails (for example, missing build tools on Linux/macOS), the app still runs with placeholder transcription text.
 
 ## Quick Start
 

@@ -16,41 +16,8 @@ import DeviceSelector from './DeviceSelector';
 import TranscriptArea from './TranscriptArea';
 import CallControls from './CallControls';
 import SummaryPanel from './SummaryPanel';
-import { getAudioInputDevices, openAudioStream } from '../utils/audioDevices';
+import { getAudioDevices, openAudioInputStream, openCallAudioStream } from '../utils/audioDevices';
 import { AudioMerger } from '../utils/audioMerger';
-
-function normalizeLabel(device) {
-  return (device.label || '').toLowerCase();
-}
-
-function isLikelyVirtualCallSource(device) {
-  const label = normalizeLabel(device);
-  const callKeywords = [
-    'loopback',
-    'stereo mix',
-    'what u hear',
-    'monitor',
-    'vb-audio',
-    'cable output',
-    'virtual cable',
-    'blackhole',
-    'sonar',
-    'chat',
-    'stream',
-    'zoom',
-    'teams',
-    'discord',
-    'system',
-  ];
-  return callKeywords.some((k) => label.includes(k));
-}
-
-function isLikelyMic(device) {
-  const label = normalizeLabel(device);
-  const micKeywords = ['mic', 'microphone', 'headset', 'input'];
-  const virtualKeywords = ['loopback', 'stereo mix', 'sonar chat', 'stream'];
-  return micKeywords.some((k) => label.includes(k)) && !virtualKeywords.some((k) => label.includes(k));
-}
 
 export default function App() {
   // ---- State ----
@@ -77,8 +44,8 @@ export default function App() {
   // -------------------------------------------------------------------
   useEffect(() => {
     async function enumerate() {
-      const audioInputs = await getAudioInputDevices();
-      setDevices(audioInputs);
+      const allAudioDevices = await getAudioDevices();
+      setDevices(allAudioDevices);
     }
     enumerate();
 
@@ -148,10 +115,11 @@ export default function App() {
     if (!callDeviceId || !micDeviceId) return;
 
     try {
-      // Open both streams using the user-selected device IDs.
-      // openAudioStream uses getUserMedia with { deviceId: { exact: id } }.
-      const callStream = await openAudioStream(callDeviceId);
-      const micStream = await openAudioStream(micDeviceId);
+      // Open selected call-audio source (virtual mixer/system capture capable)
+      // and the selected mic input.
+      const callDevice = devices.find((d) => d.deviceId === callDeviceId);
+      const callStream = await openCallAudioStream(callDevice);
+      const micStream = await openAudioInputStream(micDeviceId);
 
       callStreamRef.current = callStream;
       micStreamRef.current = micStream;
@@ -171,7 +139,7 @@ export default function App() {
       console.error('Failed to start call:', err);
       alert(`Could not open audio device: ${err.message}`);
     }
-  }, [callDeviceId, micDeviceId, handleAudioChunk]);
+  }, [callDeviceId, micDeviceId, devices, handleAudioChunk]);
 
   // -------------------------------------------------------------------
   // END CALL
@@ -221,11 +189,11 @@ export default function App() {
   // -------------------------------------------------------------------
   // RENDER
   // -------------------------------------------------------------------
-  const callDevices = devices.filter(isLikelyVirtualCallSource);
-  const micDevices = devices.filter(isLikelyMic);
-
-  const callDeviceOptions = callDevices.length > 0 ? callDevices : devices;
-  const micDeviceOptions = micDevices.length > 0 ? micDevices : devices;
+  const callDeviceOptions = [...devices].sort((a, b) => {
+    if (a.kind === b.kind) return 0;
+    return a.kind === 'audiooutput' ? -1 : 1;
+  });
+  const micDeviceOptions = devices.filter((d) => d.kind === 'audioinput');
 
   const canStart = callDeviceId !== '' && micDeviceId !== '';
 

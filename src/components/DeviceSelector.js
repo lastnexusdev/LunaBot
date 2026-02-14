@@ -1,13 +1,13 @@
 /**
  * DeviceSelector.js – Audio Input Device Dropdown Component
  *
- * Renders a <select> dropdown populated with audio input devices.
+ * Renders a <select> dropdown populated with audio devices.
  * Devices are enumerated dynamically via
  * navigator.mediaDevices.enumerateDevices(); no names are hardcoded.
  *
  * Props:
  *   label    {string}             – dropdown label text
- *   devices  {MediaDeviceInfo[]}  – audio input devices from enumeration
+ *   devices  {MediaDeviceInfo[]}  – audio devices from enumeration
  *   value    {string}             – currently selected deviceId
  *   onChange {function(deviceId)} – called when the user picks a device
  *   disabled {boolean}            – disables the dropdown during a call
@@ -27,7 +27,7 @@ export default function DeviceSelector({ label, devices, value, onChange, disabl
         <option value="">— Select a device —</option>
         {devices.map((device) => (
           <option key={device.deviceId} value={device.deviceId}>
-            {device.label || `Audio Input (${device.deviceId.slice(0, 8)}…)`}
+            {device.label || `Audio Device (${device.deviceId.slice(0, 8)}…)`}
           </option>
         ))}
       </select>

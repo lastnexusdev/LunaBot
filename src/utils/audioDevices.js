@@ -1,63 +1,86 @@
 /**
- * audioDevices.js – Audio Input Device Enumeration & Selection
- *
- * HOW DEVICE ENUMERATION WORKS
- * ────────────────────────────
- * 1. We call navigator.mediaDevices.enumerateDevices() which returns
- *    an array of MediaDeviceInfo objects for every media device the OS
- *    exposes to the browser/Electron renderer (microphones, speakers,
- *    cameras, virtual audio cables, etc.).
- *
- * 2. We filter to kind === 'audioinput' so only microphone-class
- *    devices are shown.  This includes physical mics, Sonar virtual
- *    channels, VB-Cable virtual devices, and any other audio input.
- *
- * 3. Device names are NOT hardcoded.  The dropdown is built from the
- *    live enumeration so it always reflects the current system state.
- *
- * 4. After the user picks a device, we call getUserMedia() with
- *    { audio: { deviceId: { exact: selectedDeviceId } } } to lock onto
- *    that specific device.  The `exact` constraint ensures we get that
- *    device or fail, rather than silently falling back to the default.
- *
- * NOTE: enumerateDevices() may return empty labels until the user has
- * granted microphone permission at least once.  We request a temporary
- * stream first (see requestPermissionAndEnumerate) to force the
- * permission prompt, then enumerate.
+ * audioDevices.js – Audio Device Enumeration & Stream Helpers
  */
 
 /**
- * Request microphone permission (if not already granted) and return the
- * full list of audio input devices with labels populated.
+ * Request microphone permission (if possible) then return audio devices
+ * (both inputs and outputs) so the UI can present call-source options
+ * like virtual chat mixers.
+ *
  * @returns {Promise<MediaDeviceInfo[]>}
  */
-export async function getAudioInputDevices() {
-  // A quick getUserMedia call forces the browser permission prompt so
-  // that enumerateDevices() returns device labels (not blank strings).
+export async function getAudioDevices() {
   try {
     const tempStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-    // Stop the temporary stream immediately – we only needed it for the
-    // permission grant.
     tempStream.getTracks().forEach((t) => t.stop());
   } catch {
-    // Permission denied or no devices – enumerateDevices will return
-    // whatever it can; labels may be blank.
+    // Continue; labels may be blank until permission is granted.
   }
 
   const devices = await navigator.mediaDevices.enumerateDevices();
-  return devices.filter((d) => d.kind === 'audioinput');
+  return devices.filter((d) => d.kind === 'audioinput' || d.kind === 'audiooutput');
 }
 
 /**
- * Open a MediaStream for a specific audio input device.
+ * Open a MediaStream from a specific audio input device.
  *
- * @param {string} deviceId – the deviceId from enumerateDevices()
+ * @param {string} deviceId
  * @returns {Promise<MediaStream>}
  */
-export async function openAudioStream(deviceId) {
-  // The `exact` constraint guarantees we capture from the chosen device
-  // rather than silently falling back to the OS default.
+export async function openAudioInputStream(deviceId) {
   return navigator.mediaDevices.getUserMedia({
-    audio: { deviceId: { exact: deviceId } },
+    audio: {
+      deviceId: { exact: deviceId },
+      echoCancellation: false,
+      noiseSuppression: false,
+      autoGainControl: false,
+    },
   });
+}
+
+/**
+ * Fallback path for selecting an audiooutput device: capture system audio
+ * through display capture (Electron/Chromium prompt), then keep only audio.
+ *
+ * @returns {Promise<MediaStream>}
+ */
+async function openSystemAudioFallbackStream() {
+  const displayStream = await navigator.mediaDevices.getDisplayMedia({
+    video: true,
+    audio: true,
+  });
+
+  const audioTracks = displayStream.getAudioTracks();
+  displayStream.getVideoTracks().forEach((t) => t.stop());
+
+  if (!audioTracks.length) {
+    throw new Error('System audio capture returned no audio track.');
+  }
+
+  return new MediaStream(audioTracks);
+}
+
+/**
+ * Open the selected call-audio device.
+ * - audioinput: direct getUserMedia by deviceId
+ * - audiooutput: try direct capture first; if unsupported, fallback to
+ *   system audio capture via getDisplayMedia.
+ *
+ * @param {MediaDeviceInfo} device
+ * @returns {Promise<MediaStream>}
+ */
+export async function openCallAudioStream(device) {
+  if (!device) {
+    throw new Error('No call-audio device selected.');
+  }
+
+  try {
+    return await openAudioInputStream(device.deviceId);
+  } catch (err) {
+    if (device.kind !== 'audiooutput') {
+      throw err;
+    }
+
+    return openSystemAudioFallbackStream();
+  }
 }

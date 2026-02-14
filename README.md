@@ -32,7 +32,7 @@ The setup script (`scripts/setup-whisper.js`) does this cross-platform:
 - **Linux/macOS**: clones `whisper.cpp` and builds it locally with CMake
 - **All platforms**: downloads `whisper/models/ggml-base.en.bin` if missing
 
-If setup fails (for example, missing build tools on Linux/macOS), the app still runs with placeholder transcription text.
+If setup fails (for example, missing build tools or temporary network issues), install continues and the app runs with placeholder transcription text. Set `WHISPER_SETUP_STRICT=1` to make setup failures fatal.
 
 ## Quick Start
 

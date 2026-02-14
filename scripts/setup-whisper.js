@@ -4,6 +4,8 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const { spawnSync } = require('child_process');
+const { Readable } = require('stream');
+const { pipeline } = require('stream/promises');
 
 const ROOT = path.join(__dirname, '..');
 const WHISPER_DIR = path.join(ROOT, 'whisper');
@@ -43,12 +45,14 @@ async function downloadFile(url, outPath) {
   if (!res.ok) {
     throw new Error(`Failed download: ${url} (${res.status})`);
   }
-  const file = fs.createWriteStream(outPath);
-  await new Promise((resolve, reject) => {
-    res.body.pipe(file);
-    res.body.on('error', reject);
-    file.on('finish', resolve);
-  });
+
+  if (res.body && typeof res.body.getReader === 'function') {
+    await pipeline(Readable.fromWeb(res.body), fs.createWriteStream(outPath));
+    return;
+  }
+
+  const data = await res.arrayBuffer();
+  fs.writeFileSync(outPath, Buffer.from(data));
 }
 
 function copyFileResolved(src, destDir, destName = path.basename(src)) {
@@ -191,5 +195,8 @@ async function main() {
 
 main().catch((err) => {
   console.error(`[setup-whisper] Failed: ${err.message}`);
-  process.exit(1);
+  if (process.env.WHISPER_SETUP_STRICT === '1') {
+    process.exit(1);
+  }
+  console.warn('[setup-whisper] Continuing without Whisper (set WHISPER_SETUP_STRICT=1 to fail fast).');
 });

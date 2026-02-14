@@ -3,4 +3,4 @@ dist/
 build/
 *.log
 .DS_Store
-whisper/models/
+whisper/

@@ -11,8 +11,10 @@
  * ──────────────────
  * 1. Build or download whisper.cpp:
  *      git clone https://github.com/ggerganov/whisper.cpp
- *      cd whisper.cpp && make
- *    Place the binary at:  <app>/whisper/main   (or whisper/main.exe)
+ *      cd whisper.cpp && cmake -B build && cmake --build build --config Release
+ *    Place the binary at:  <app>/whisper/whisper-cli   (or whisper-cli.exe)
+ *    Also copy the shared libraries (libwhisper.so, libggml*.so) into
+ *    the same <app>/whisper/ directory.
  *
  * 2. Download a GGML model (e.g. ggml-base.en.bin):
  *      bash whisper.cpp/models/download-ggml-model.sh base.en
@@ -45,10 +47,10 @@ const appRoot = isPackaged
   ? path.join(process.resourcesPath)
   : path.join(__dirname, '..', '..');
 
+const WHISPER_DIR = path.join(appRoot, 'whisper');
 const WHISPER_BIN = path.join(
-  appRoot,
-  'whisper',
-  process.platform === 'win32' ? 'main.exe' : 'main'
+  WHISPER_DIR,
+  process.platform === 'win32' ? 'whisper-cli.exe' : 'whisper-cli'
 );
 const WHISPER_MODEL = path.join(
   appRoot,
@@ -171,10 +173,19 @@ async function transcribeBuffer(float32Samples, sampleRate = 48000) {
       '-m', WHISPER_MODEL,
       '-f', tmpPath,
       '--no-timestamps',
-      '-nt',            // no timestamps in output
     ];
 
-    const proc = spawn(WHISPER_BIN, args, { stdio: ['ignore', 'pipe', 'pipe'] });
+    // Set LD_LIBRARY_PATH (Linux) / DYLD_LIBRARY_PATH (macOS) so the
+    // dynamically linked libwhisper.so and libggml*.so are found next to
+    // the binary.
+    const env = { ...process.env };
+    if (process.platform === 'linux') {
+      env.LD_LIBRARY_PATH = WHISPER_DIR + (env.LD_LIBRARY_PATH ? ':' + env.LD_LIBRARY_PATH : '');
+    } else if (process.platform === 'darwin') {
+      env.DYLD_LIBRARY_PATH = WHISPER_DIR + (env.DYLD_LIBRARY_PATH ? ':' + env.DYLD_LIBRARY_PATH : '');
+    }
+
+    const proc = spawn(WHISPER_BIN, args, { stdio: ['ignore', 'pipe', 'pipe'], env });
     let stdout = '';
     let stderr = '';
 

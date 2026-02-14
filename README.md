@@ -22,7 +22,7 @@ Offline desktop call transcription and summarization application built with **El
 1. Build [whisper.cpp](https://github.com/ggerganov/whisper.cpp):
    ```bash
    git clone https://github.com/ggerganov/whisper.cpp
-   cd whisper.cpp && make
+   cd whisper.cpp && cmake -B build && cmake --build build --config Release
    ```
 2. Download a model:
    ```bash
@@ -31,7 +31,11 @@ Offline desktop call transcription and summarization application built with **El
 3. Place files in the project:
    ```
    whisper/
-     main            # (or main.exe on Windows)
+     whisper-cli          # (or whisper-cli.exe on Windows)
+     libwhisper.so        # shared libraries (Linux)
+     libggml.so
+     libggml-base.so
+     libggml-cpu.so
      models/
        ggml-base.en.bin
    ```

@@ -16,7 +16,7 @@ import DeviceSelector from './DeviceSelector';
 import TranscriptArea from './TranscriptArea';
 import CallControls from './CallControls';
 import SummaryPanel from './SummaryPanel';
-import { getAudioInputDevices, openAudioStream } from '../utils/audioDevices';
+import { getAudioDevices, openAudioInputStream, openCallAudioStream } from '../utils/audioDevices';
 import { AudioMerger } from '../utils/audioMerger';
 
 export default function App() {
@@ -44,8 +44,8 @@ export default function App() {
   // -------------------------------------------------------------------
   useEffect(() => {
     async function enumerate() {
-      const audioInputs = await getAudioInputDevices();
-      setDevices(audioInputs);
+      const allAudioDevices = await getAudioDevices();
+      setDevices(allAudioDevices);
     }
     enumerate();
 
@@ -115,10 +115,11 @@ export default function App() {
     if (!callDeviceId || !micDeviceId) return;
 
     try {
-      // Open both streams using the user-selected device IDs.
-      // openAudioStream uses getUserMedia with { deviceId: { exact: id } }.
-      const callStream = await openAudioStream(callDeviceId);
-      const micStream = await openAudioStream(micDeviceId);
+      // Open selected call-audio source (virtual mixer/system capture capable)
+      // and the selected mic input.
+      const callDevice = devices.find((d) => d.deviceId === callDeviceId);
+      const callStream = await openCallAudioStream(callDevice);
+      const micStream = await openAudioInputStream(micDeviceId);
 
       callStreamRef.current = callStream;
       micStreamRef.current = micStream;
@@ -138,7 +139,7 @@ export default function App() {
       console.error('Failed to start call:', err);
       alert(`Could not open audio device: ${err.message}`);
     }
-  }, [callDeviceId, micDeviceId, handleAudioChunk]);
+  }, [callDeviceId, micDeviceId, devices, handleAudioChunk]);
 
   // -------------------------------------------------------------------
   // END CALL
@@ -188,6 +189,12 @@ export default function App() {
   // -------------------------------------------------------------------
   // RENDER
   // -------------------------------------------------------------------
+  const callDeviceOptions = [...devices].sort((a, b) => {
+    if (a.kind === b.kind) return 0;
+    return a.kind === 'audiooutput' ? -1 : 1;
+  });
+  const micDeviceOptions = devices.filter((d) => d.kind === 'audioinput');
+
   const canStart = callDeviceId !== '' && micDeviceId !== '';
 
   return (
@@ -202,14 +209,14 @@ export default function App() {
         <div className="device-row">
           <DeviceSelector
             label="Call Audio Device"
-            devices={devices}
+            devices={callDeviceOptions}
             value={callDeviceId}
             onChange={setCallDeviceId}
             disabled={isCallActive}
           />
           <DeviceSelector
             label="Microphone"
-            devices={devices}
+            devices={micDeviceOptions}
             value={micDeviceId}
             onChange={setMicDeviceId}
             disabled={isCallActive}

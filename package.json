@@ -4,12 +4,13 @@
   "description": "CallSage – Offline desktop call transcription and summarization app built with Electron + React",
   "main": "main.js",
   "scripts": {
+    "setup-whisper": "node scripts/setup-whisper.js",
     "start": "webpack --mode development && electron .",
     "dev": "concurrently \"webpack --mode development --watch\" \"electron .\"",
     "build:renderer": "webpack --mode production",
-    "build": "npm run build:renderer && electron-builder",
-    "pack": "npm run build:renderer && electron-builder --dir",
-    "postinstall": "electron-builder install-app-deps"
+    "build": "npm run setup-whisper && npm run build:renderer && electron-builder",
+    "pack": "npm run setup-whisper && npm run build:renderer && electron-builder --dir",
+    "postinstall": "electron-builder install-app-deps && npm run setup-whisper"
   },
   "dependencies": {
     "react": "^18.2.0",
